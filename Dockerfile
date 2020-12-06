@@ -12,7 +12,7 @@ EXPOSE 8080
 EXPOSE 8996
 
 # The application's jar file
-ARG JAR_FILE=target/core-0.0.1.jar
+ARG JAR_FILE=target/ussd-0.0.1-SNAPSHOT.jar
 
 # Add the application's jar to the container
 ADD ${JAR_FILE} core.jar
