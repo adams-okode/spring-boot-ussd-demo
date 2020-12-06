@@ -1,0 +1,38 @@
+{
+    "1": {
+        "id": 230,
+        "menu_level": 1,
+        "text": "What would you like to check\\n1. My account\\2. My phone number",
+        "menu_options": [
+            {
+                "type": "level",
+                "response": null,
+                "next_menu_level": 2
+            },
+            {
+                "type": "response",
+                "response": "END Your Phone Number is <accountBalance>",
+                "next_menu_level": null
+            }
+        ],
+        "action": "CON"
+    },
+    "2": {
+        "id": 230,
+        "menu_level": 2,
+        "text": "Choose account information you want to view\\n1. Account number\\n2. Account balance",
+        "menu_options": [
+            {
+                "type": "response",
+                "response": "END Your account number is <accountNumber>",
+                "next_menu_level": null
+            },
+            {
+                "type": "response",
+                "response": "END Your Account balance is <accountBalance>",
+                "next_menu_level": null
+            }
+        ],
+        "action": "CON"
+    }
+}

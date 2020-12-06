@@ -1,0 +1,5 @@
+{"properties": [{
+  "name": "decoded",
+  "type": "com.decoded.ussd.configs.ApplicationConfiguration",
+  "description": "A description for 'decoded'"
+}]}
