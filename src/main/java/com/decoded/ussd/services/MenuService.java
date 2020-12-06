@@ -19,8 +19,7 @@ public class MenuService {
         ObjectMapper objectMapper = new ObjectMapper();
         File resource = new ClassPathResource("menu.json").getFile();
         String json = new String(Files.readAllBytes(resource.toPath()));
-        return objectMapper.readValue(json, new TypeReference<Map<String, Menu>>() {
-        });
+        return objectMapper.readValue(json, new TypeReference<Map<String, Menu>>() {});
     }
 
 }

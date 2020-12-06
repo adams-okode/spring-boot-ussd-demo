@@ -22,4 +22,7 @@ public class Menu {
 
     @JsonProperty("action")
     private String action;
+
+    @JsonProperty("max_selections")
+    private Integer maxSelections;
 }

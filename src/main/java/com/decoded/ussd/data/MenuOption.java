@@ -1,5 +1,6 @@
 package com.decoded.ussd.data;
 
+import com.decoded.ussd.enums.MenuOptionAction;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import lombok.Data;
@@ -13,4 +14,6 @@ public class MenuOption {
 
     @JsonProperty("next_menu_level")
     private String nextMenuLevel;
+
+    private MenuOptionAction action;
 }

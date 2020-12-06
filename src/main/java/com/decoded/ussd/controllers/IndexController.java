@@ -32,12 +32,12 @@ public class IndexController {
 
     @PostMapping(path = "ussd")
     public String ussdIngress(@RequestParam String sessionId, @RequestParam String serviceCode,
-            @RequestParam String phoneNumber, @RequestParam String text) {
-        
-        try {
-            return ussdRoutingService.menuLevelRouter(text);
-        } catch (IOException e) {
-            return "END Service Downtime";
-        }
+            @RequestParam String phoneNumber, @RequestParam String text) throws IOException {
+
+        // try {
+            return ussdRoutingService.menuLevelRouter(sessionId, serviceCode, phoneNumber, text);
+        // } catch (IOException e) {
+        //     return "END " + e.getMessage();
+        // }
     }
 }
