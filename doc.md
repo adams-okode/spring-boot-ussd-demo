@@ -71,7 +71,34 @@ to enable us track and destroy the session accordingly. Caching is extremely imp
 The cache layer for this particular tutorial will rely heavily on redis,
 
 1. Create  @[redis labs](https://redislabs.com/try-free/) account and deploy a redis instance
-2. 
+2. Setting Up application configurations 
+    ```java
+    @Configuration
+    @ConfigurationProperties(prefix = "decoded")
+    @Data
+    public class ApplicationConfiguration {
+
+        private CacheConfigurationProperties cache;
+
+        @Getter(value = AccessLevel.PUBLIC)
+        private class CacheConfigurationProperties {
+            private Integer port;
+            private String host;
+            private String password;
+            private String defaultTtl;
+        }
+    }
+    ```
+
+    application.yaml for the corresponding configurations will be as below 
+    ```yaml
+    decoded:
+        cache:
+            port: #redis-port
+            host: #redis-host
+            password: #provided password
+            default-ttl: 180
+    ```
 3. Redis configurations
 
     configs/RedisConfiguration.java
