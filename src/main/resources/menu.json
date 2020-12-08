@@ -2,7 +2,7 @@
     "1": {
         "id": 230,
         "menu_level": 1,
-        "text": "What would you like to check\n1. My account\n2. My phone number",
+        "text": "CON What would you like to check\n1. My account\n2. My phone number",
         "menu_options": [
             {
                 "type": "level",
@@ -17,13 +17,12 @@
                 "action": "PROCESS_ACC_PHONE_NUMBER"
             }
         ],
-        "max_selections": 3,
-        "action": "CON"
+        "max_selections": 3
     },
     "2": {
         "id": 230,
         "menu_level": 2,
-        "text": "Choose account information you want to view\n1. Account number\n2. Account balance",
+        "text": "CON Choose account information you want to view\n1. Account number\n2. Account balance",
         "menu_options": [
             {
                 "type": "response",
@@ -38,7 +37,6 @@
                 "action": "PROCESS_ACC_BALANCE"
             }
         ],
-        "max_selections": 3,
-        "action": "CON"
+        "max_selections": 3
     }
 }

@@ -66,12 +66,11 @@ public String ussdIngress(@RequestParam String sessionId, @RequestParam String s
 ```
 ## Session Handling
 
-This tutorial is tightly coupled to Africa's talking hence session management depends heavily on the ***sessionId*** Param provided to the callback. We therefore need to store the session Id
-to enable us track and destroy the session accordingly. Caching is extremely important at this point as it will allow faster storage and retreival of the active sessions.
-The cache layer for this particular tutorial will rely heavily on redis,
+This tutorial is tightly coupled to Africa's talking USSD provision, hence session management depends heavily on the ***sessionId*** Param provided to the callback registerd for the serviceCode. We inturn need to store the session Id to enable us track and destroy the session accordingly from the API end. Caching becomes extremely important at this point as it will allow faster storage and retreival of the active sessions.
+The cache layer for this particular tutorial will be implemented on redis. Let's start by configuring everrything needed by Redis to handle the session form the application end.
 
-1. Create  @[redis labs](https://redislabs.com/try-free/) account and deploy a redis instance
-2. Setting Up application configurations 
+1. Create  @[redis labs](https://redislabs.com/try-free/) account and deploy a free redis instance
+2. Setting Up application configurations
     ```java
     @Configuration
     @ConfigurationProperties(prefix = "decoded")
@@ -100,7 +99,7 @@ The cache layer for this particular tutorial will rely heavily on redis,
             default-ttl: 180
     ```
 3. Redis configurations
-
+    You we'll use Lettuce which comes readliy within spring data redis to configure the connection Factory
     configs/RedisConfiguration.java
    ```java
     @Configuration
@@ -132,6 +131,8 @@ The cache layer for this particular tutorial will rely heavily on redis,
 
 4. Session Dto
    
+   This is how we'll store the session data in the cache layer.
+
    ```java
     @Data
     /**
@@ -190,7 +191,124 @@ The cache layer for this particular tutorial will rely heavily on redis,
 
 ## Dynamic Menus
 
---
+It's important to have the ability to load menus dynamically at runtime, reason being that making changes to dynamically served data is much easier than on statically defines menus may need recompilation and redeployment of the app.
 
+### Menu Structure
+
+1. Menu Levels
+   For every request to the API the server responds with a message, sending the user deeper into the implemented sequence hence the term levels. Its important to keep track of where the user is currently at to know which Menu or reponse to serve.
+2. Menu Options
+   As the name suggests these are just options provided to the user within the Menu to allow the user know how to respond on the USSD interface.
+
+To start us off with the Menus we'll define the structure of the Menu Levels and Options
+
+```java MenuLevels Definition
+@Data
+public class Menu {
+    @JsonProperty("id")
+    private String id; // id of Record as stored in the database or whatever Datastore used
+
+    @JsonProperty("menu_level")
+    private String menuLevel; // Menu Level unique identifier
+
+    @JsonProperty("text")
+    private String text; // Text to be return for the exact response 
+
+    @JsonProperty("menu_options")
+    private List<MenuOption> menuOptions; // Options available for this Menu Level
+    
+    @JsonProperty("max_selections")
+    private Integer maxSelections;
+}
+```
+
+```java Menu Options Definition
+@Data
+public class MenuOption {
+
+    private String type; // helps to determine if the next step should return a response or serve a different menu
+
+    private String response; // response text to be returned
+
+    @JsonProperty("next_menu_level")
+    private String nextMenuLevel;// next Menu to be displayed if  the type should return a menu
+
+    private MenuOptionAction action; // action router .i.e. What process should be performed to retrieve the correct set of data for display
+}
+```
+
+Actions will help us know how to route the options selected by the user
+
+```java Menu Option Action
+public enum MenuOptionAction {
+
+    PROCESS_ACC_BALANCE("PROCESS_ACC_BALANCE"),
+    PROCESS_ACC_PHONE_NUMBER("PROCESS_ACC_PHONE_NUMBER"),
+    PROCESS_ACC_NUMBER("PROCESS_ACC_NUMBER");
+
+    private String action;
+
+    MenuOptionAction(String action) {
+        this.action = action;
+    }
+
+    @JsonValue
+    private String getAction() {
+        return action;
+    }
+}
+
+```
+
+For this tutorial we'll store the menus in a json file within the resource folder.
+
+> **Note** that replaceable vars are denotes as ${XXXXXX}
+
+```json menus.json
+{
+    "1": {
+        "id": 230,
+        "menu_level": 1,
+        "text": "What would you like to check\n1. My account\n2. My phone number",
+        "menu_options": [
+            {
+                "type": "level",
+                "response": null,
+                "next_menu_level": 2,
+                "action": null
+            },
+            {
+                "type": "response",
+                "response": "END Your Phone Number is ${phone_number}",
+                "next_menu_level": null,
+                "action": "PROCESS_ACC_PHONE_NUMBER"
+            }
+        ],
+        "max_selections": 3,
+        "action": "CON"
+    },
+    "2": {
+        "id": 230,
+        "menu_level": 2,
+        "text": "Choose account information you want to view\n1. Account number\n2. Account balance",
+        "menu_options": [
+            {
+                "type": "response",
+                "response": "END Your account number is ${account_number}",
+                "next_menu_level": null,
+                "action": "PROCESS_ACC_NUMBER"
+            },
+            {
+                "type": "response",
+                "response": "END Your Account balance is ${account_balance}",
+                "next_menu_level": null,
+                "action": "PROCESS_ACC_BALANCE"
+            }
+        ],
+        "max_selections": 3,
+        "action": "CON"
+    }
+}
+```
 
 ## Deployment of the USSD platform
