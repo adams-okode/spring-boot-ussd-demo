@@ -19,8 +19,6 @@ jobs:
       - name: Build with Maven
         run: mvn -B package --file pom.xml
 
-     
-
       - name: Generate deployment package
         run: zip -r deploy.zip . -x '*.git*'
 
@@ -34,3 +32,4 @@ jobs:
           version_label: ussd-demo-api-${{ github.sha }}
           region: us-east-2
           deployment_package: deploy.zip
+          wait_for_deployment: false
