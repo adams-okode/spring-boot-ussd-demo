@@ -202,7 +202,8 @@ It's important to have the ability to load menus dynamically at runtime, reason 
 
 To start us off with the Menus we'll define the structure of the Menu Levels and Options
 
-```java MenuLevels Definition
+#### MenuLevels Definition
+```java 
 @Data
 public class Menu {
     @JsonProperty("id")
@@ -216,12 +217,13 @@ public class Menu {
 
     @JsonProperty("menu_options")
     private List<MenuOption> menuOptions; // Options available for this Menu Level
-    
+
     @JsonProperty("max_selections")
-    private Integer maxSelections;
+    private Integer maxSelections; // Max selection identifier to enable diferentiation between value provided and options selections i.e. if request is for Acc No and options are 3 the as simple check for when the value is above 3 would suffice.
 }
 ```
 
+#### Menu Options Definition
 ```java Menu Options Definition
 @Data
 public class MenuOption {
@@ -239,6 +241,7 @@ public class MenuOption {
 
 Actions will help us know how to route the options selected by the user
 
+#### Option Actions Definition
 ```java Menu Option Action
 public enum MenuOptionAction {
 
@@ -260,6 +263,7 @@ public enum MenuOptionAction {
 
 ```
 
+#### The Actual Menus
 For this tutorial we'll store the menus in a json file within the resource folder.
 
 > **Note** that replaceable vars are denotes as ${XXXXXX}
@@ -269,7 +273,7 @@ For this tutorial we'll store the menus in a json file within the resource folde
     "1": {
         "id": 230,
         "menu_level": 1,
-        "text": "What would you like to check\n1. My account\n2. My phone number",
+        "text": "CON What would you like to check\n1. My account\n2. My phone number",
         "menu_options": [
             {
                 "type": "level",
@@ -284,13 +288,12 @@ For this tutorial we'll store the menus in a json file within the resource folde
                 "action": "PROCESS_ACC_PHONE_NUMBER"
             }
         ],
-        "max_selections": 3,
-        "action": "CON"
+        "max_selections": 3
     },
     "2": {
         "id": 230,
         "menu_level": 2,
-        "text": "Choose account information you want to view\n1. Account number\n2. Account balance",
+        "text": "CON Choose account information you want to view\n1. Account number\n2. Account balance",
         "menu_options": [
             {
                 "type": "response",
@@ -305,10 +308,281 @@ For this tutorial we'll store the menus in a json file within the resource folde
                 "action": "PROCESS_ACC_BALANCE"
             }
         ],
-        "max_selections": 3,
-        "action": "CON"
+        "max_selections": 3
     }
 }
 ```
 
+#### Fetching the Menu from the store. 
+Since the Menus are stored in the resource folder all we need to do is directlu read the data into an InputStream that will be converted to String and Map that to the correct Type.
+
+Create a MenuService within the service folder and add the code below.
+
+```java
+
+@Service
+public class MenuService {
+
+    @Autowired
+    ResourceLoader resourceLoader;
+
+    /**
+     * 
+     * @param inputStream
+     * @return
+     * @throws IOException
+     */
+    private String readFromInputStream(InputStream inputStream) throws IOException {
+        StringBuilder resultStringBuilder = new StringBuilder();
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(inputStream))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                resultStringBuilder.append(line).append("\n");
+            }
+        }
+        return resultStringBuilder.toString();
+    }
+
+    /**
+     * 
+     * @return
+     * @throws IOException
+     */
+    public Map<String, Menu> loadMenus() throws IOException {
+        ObjectMapper objectMapper = new ObjectMapper();
+        Resource resource = resourceLoader.getResource("classpath:menu.json");
+        InputStream input = resource.getInputStream();
+        String json = readFromInputStream(input);
+        return objectMapper.readValue(json, new TypeReference<Map<String, Menu>>() {
+        });
+    }
+
+}
+```
+
+#### Menu Routing
+Let's now put everything together by creating the UssdRoutingService within the services folder 
+
+```java
+
+    /**
+     * Inject The necessary services
+     * 
+     **/
+    @Autowired
+    private MenuService menuService;
+
+    @Autowired
+    private SessionService sessionService;
+
+    /**
+     * 
+     * @param sessionId
+     * @param serviceCode
+     * @param phoneNumber
+     * @param text
+     * @return
+     * @throws IOException
+     */
+    public String menuLevelRouter(String sessionId, String serviceCode, String phoneNumber, String text)
+            throws IOException {
+        Map<String, Menu> menus = menuService.loadMenus();
+        UssdSession session = checkAndSetSession(sessionId, serviceCode, phoneNumber, text);
+        /**
+         * Check if response has some value
+         * On first contact the value will be empty
+         */
+        if (text.length() > 0) {
+            return getNextMenuItem(session, menus);
+        } else {
+            return menus.get(session.getCurrentMenuLevel()).getText();
+        }
+    }
+```
+
+
+- Fetching the next Menu level to be displayed
+```java
+/**
+     * 
+     * @param session
+     * @param menus
+     * @return
+     * @throws IOException
+     */
+    public String getNextMenuItem(UssdSession session, Map<String, Menu> menus) throws IOException {
+        String[] levels = session.getText().split("\\*");
+        String lastValue = levels[levels.length - 1];
+        Menu menuLevel = menus.get(session.getCurrentMenuLevel());
+
+        if (Integer.parseInt(lastValue) <= menuLevel.getMaxSelections()) {
+            MenuOption menuOption = menuLevel.getMenuOptions().get(Integer.parseInt(lastValue) - 1);
+            return processMenuOption(session, menuOption);
+        }
+
+        return "CON ";
+    }
+```
+
+
+- Get the Menu Level Properties directly from the Menu Service
+```java
+    /**
+     * 
+     * @param menuLevel
+     * @return
+     * @throws IOException
+     */
+    public String getMenu(String menuLevel) throws IOException {
+        Map<String, Menu> menus = menuService.loadMenus();
+        return menus.get(menuLevel).getText();
+    }
+```
+
+
+- Processing the provided input, determining the response type and updatting the session accordingly
+
+```java
+    /**
+     * 
+     * @param menuOption
+     * @return
+     * @throws IOException
+     */
+    public String processMenuOption(UssdSession session, MenuOption menuOption) throws IOException {
+        if (menuOption.getType().equals("response")) {
+            return processMenuOptionResponses(menuOption);
+        } else if (menuOption.getType().equals("level")) {
+            updateSessionMenuLevel(session, menuOption.getNextMenuLevel());
+            return getMenu(menuOption.getNextMenuLevel());
+        } else {
+            return "CON ";
+        }
+    }
+```
+
+
+- Checking the response action and and swithing throun the avaialble Action types
+This is where API calls to an external service can be made to trigger certain events or pull data from said API.
+
+```java
+    /**
+     * 
+     * @param menuOption
+     * @return
+     */
+    public String processMenuOptionResponses(MenuOption menuOption) {
+        String response = menuOption.getResponse();
+        Map<String, String> variablesMap = new HashMap<>();
+
+        if (menuOption.getAction() == MenuOptionAction.PROCESS_ACC_BALANCE) {
+            variablesMap.put("account_balance", "10000");
+            response = replaceVariable(variablesMap, response);
+        } else if (menuOption.getAction() == MenuOptionAction.PROCESS_ACC_NUMBER) {
+            variablesMap.put("account_number", "123412512");
+            response = replaceVariable(variablesMap, response);
+        } else if (menuOption.getAction() == MenuOptionAction.PROCESS_ACC_PHONE_NUMBER) {
+            variablesMap.put("phone_number", "254702759950");
+            response = replaceVariable(variablesMap, response);
+        }
+
+        return response;
+    }
+```
+- Replace variables on the response text with the fetched data usin the **StringSubstitutor** class. for this step you need to first add the org.apache.commons, commons-text and commons-lang3 dependencies
+
+```xml
+<dependency>
+    <groupId>org.apache.commons</groupId>
+    <artifactId>commons-text</artifactId>
+    <version>1.9</version>
+</dependency>
+
+<dependency>
+    <groupId>org.apache.commons</groupId>
+    <artifactId>commons-lang3</artifactId>
+    <version>3.11</version>
+</dependency>
+```
+
+```java
+    /**
+     * 
+     * @param variablesMap
+     * @param response
+     * @return
+     */
+    public String replaceVariable(Map<String, String> variablesMap, String response) {
+        StringSubstitutor sub = new StringSubstitutor(variablesMap);
+        return sub.replace(response);
+    }
+```
+
+
+- Updating Session Data wiht the newly set level as well as the previous session this will allow for complex functionality such as allowing movment back and forth through the available menus
+
+```java
+    /**
+     * 
+     * @param session
+     * @param menuLevel
+     * @return
+     */
+    public UssdSession updateSessionMenuLevel(UssdSession session, String menuLevel) {
+        session.setPreviousMenuLevel(session.getCurrentMenuLevel());
+        session.setCurrentMenuLevel(menuLevel);
+        return sessionService.update(session);
+    }
+```
+
+
+
+- This is processed on every request to track session updating or creating the session based on the details provided.
+
+```java
+    /**
+     * Check, Set or update the existing session with the provided Session Id
+     * 
+     * @param sessionId
+     * @param serviceCode
+     * @param phoneNumber
+     * @param text
+     * @return
+     */
+    public UssdSession checkAndSetSession(String sessionId, String serviceCode, String phoneNumber, String text) {
+        UssdSession session = sessionService.get(sessionId);
+
+        if (session != null) {
+            session.setText(text);
+            return sessionService.update(session);
+        }
+
+        session = new UssdSession();
+        session.setCurrentMenuLevel("1");
+        session.setPreviousMenuLevel("1");
+        session.setId(sessionId);
+        session.setPhoneNumber(phoneNumber);
+        session.setServiceCode(serviceCode);
+        session.setText(text);
+
+        return sessionService.createUssdSession(session);
+    }
+```
+
 ## Deployment of the USSD platform
+For this Particular implementation Elastic Beanstalk was chosen for deployment. find more on this refer to [@aws beanstalk](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/create_deploy_docker.html). For More in formation on how to dockerize Spring boot applications please refer to [this](https://developers.decoded.africa/dockerizing-spring-boot/) article. 
+
+Once we have deployed the application. Next is to link the particular deployment to a service code and allow phone users access our application on USSD.
+
+Steps to linking service Code
+- Head over to Africas talking create an account or login if you already have one. 
+- Switch to sandbox
+- Open the USSD menu and create a channel
+  ![](./images/1.png)
+- Link Channel callback to the url of the hosted app
+    ![](./images/2.png)
+
+    ![](./images/3.png)
+
+- Test App Using the simulator
+
