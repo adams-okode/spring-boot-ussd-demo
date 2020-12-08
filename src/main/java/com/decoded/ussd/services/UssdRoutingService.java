@@ -41,7 +41,7 @@ public class UssdRoutingService {
         if (text.length() > 0) {
             return getNextMenuItem(session, menus);
         } else {
-            return menus.get(session.getCurrentMenuLevel()).getAction()
+            return menus.get(session.getCurrentMenuLevel()).getAction() + " "
                     + menus.get(session.getCurrentMenuLevel()).getText();
         }
     }
@@ -74,7 +74,7 @@ public class UssdRoutingService {
      */
     public String getMenu(String menuLevel) throws IOException {
         Map<String, Menu> menus = menuService.loadMenus();
-        return menus.get(menuLevel).getAction() + menus.get(menuLevel).getText();
+        return menus.get(menuLevel).getAction() + " " + menus.get(menuLevel).getText();
     }
 
     /**
