@@ -1,25 +1,55 @@
 package com.decoded.ussd.services;
 
-import java.io.File;
+import java.io.BufferedReader;
 import java.io.IOException;
-import java.nio.file.Files;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.Map;
 
 import com.decoded.ussd.data.Menu;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
 
 @Service
 public class MenuService {
 
+    @Autowired
+    ResourceLoader resourceLoader;
+
+    /**
+     * 
+     * @param inputStream
+     * @return
+     * @throws IOException
+     */
+    private String readFromInputStream(InputStream inputStream) throws IOException {
+        StringBuilder resultStringBuilder = new StringBuilder();
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(inputStream))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                resultStringBuilder.append(line).append("\n");
+            }
+        }
+        return resultStringBuilder.toString();
+    }
+
+    /**
+     * 
+     * @return
+     * @throws IOException
+     */
     public Map<String, Menu> loadMenus() throws IOException {
         ObjectMapper objectMapper = new ObjectMapper();
-        File resource = new ClassPathResource("menu.json").getFile();
-        String json = new String(Files.readAllBytes(resource.toPath()));
-        return objectMapper.readValue(json, new TypeReference<Map<String, Menu>>() {});
+        Resource resource = resourceLoader.getResource("classpath:menu.json");
+        InputStream input = resource.getInputStream();
+        String json = readFromInputStream(input);
+        return objectMapper.readValue(json, new TypeReference<Map<String, Menu>>() {
+        });
     }
 
 }

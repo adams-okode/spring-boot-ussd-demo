@@ -1,7 +1,6 @@
 package com.decoded.ussd.controllers;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 
 import com.decoded.ussd.data.Menu;
