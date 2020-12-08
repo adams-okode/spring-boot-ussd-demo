@@ -25,9 +25,24 @@ public class IndexController {
     @Autowired
     private UssdRoutingService ussdRoutingService;
 
+    /**
+     * 
+     * @return
+     * @throws IOException
+     */
     @GetMapping(path = "menus")
     public Map<String, Menu> menusLoad() throws IOException {
         return menuService.loadMenus();
+    }
+
+    /**
+     * 
+     * @return
+     * @throws IOException
+     */
+    @GetMapping(path = "")
+    public String index() throws IOException {
+        return "Your have reached us";
     }
 
     /**
@@ -42,11 +57,10 @@ public class IndexController {
     @PostMapping(path = "ussd")
     public String ussdIngress(@RequestParam String sessionId, @RequestParam String serviceCode,
             @RequestParam String phoneNumber, @RequestParam String text) throws IOException {
-
-        // try {
+        try {
             return ussdRoutingService.menuLevelRouter(sessionId, serviceCode, phoneNumber, text);
-        // } catch (IOException e) {
-        //     return "END " + e.getMessage();
-        // }
+        } catch (IOException e) {
+            return "END " + e.getMessage();
+        }
     }
 }
