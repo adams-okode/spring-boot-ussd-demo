@@ -30,6 +30,15 @@ public class IndexController {
         return menuService.loadMenus();
     }
 
+    /**
+     * 
+     * @param sessionId
+     * @param serviceCode
+     * @param phoneNumber
+     * @param text
+     * @return
+     * @throws IOException
+     */
     @PostMapping(path = "ussd")
     public String ussdIngress(@RequestParam String sessionId, @RequestParam String serviceCode,
             @RequestParam String phoneNumber, @RequestParam String text) throws IOException {
