@@ -1,33 +1,38 @@
 # Introduction
 
-According to Wikipedia USSD(Unstructured Supplementary Service Data)  is a communications protocol used by GSM cellular telephones to communicate with the mobile network operator's computers. USSD can be used for WAP browsing, prepaid callback service, mobile-money services, location-based content services, menu-based information services, and as part of configuring the phone on the network.
-Basically 
+According to Wikipedia USSD (Unstructured Supplementary Service Data) is a communications protocol used by GSM cellular telephones to communicate with the mobile network operator's computers. USSD can be used for WAP browsing, prepaid callback service, mobile-money services, location-based content services, menu-based information services, and as part of configuring the phone on the network.
 
-- User dials the provided USSD code.
+The Basic USSD Flow usually take the approach below;
+- User dials the provided USSD code. (This is done automatically for services that exist readily within the SIM Tool Kit)
 - The request is forwarded to the MNO(Mobile Network Operator).
 - The MNO routes the request through a gateway to the machine hosting the web application.
-- The application process the requests it receives and sends back a valid response.
+- The application processes the requests it receives and sends back a valid response.
 - The feedback is processed by the MNO and sent back to the mobile phone.
 
-What you'll need 
+**Who is this article for ?**
+This article is aimed towards Java Developers who would like a more robust variation of USSD implementation that readily utilizes the large ecosystem provided by spring boot.
+
+**What you'll need** 
 - Some knowledge of Java and Spring boot
-- Africas talking account 
+- Africa's talking account 
 - Some docker Knowledge (minimal)
-- AWS account
+- AWS account(If you decide to host on AWS)
+
+The idea behind this article is to act as an extension of the current Africa's Talking documentation on USSD java implementation, to talk about handling sessions better as well caching said sessions for faster access to improve performance of the USSD application at scale, and finally deploying this and hooking into Africa's Talking.
 
 ## Getting Started
 
-USSD is session driven. What does this mean , well whenever you dial *XXX# a session with a unique Id is created and maintained to allow change of data from the end device to the remote API.[The session typically lasts 180s for most MNOs in kenya ](https://help.africastalking.com/en/articles/1284071-what-is-the-duration-of-a-ussd-session-for-kenyan-telcos) it may be different for other MNOs. As the developer you'll need to keep track of the session and be catious of the time limit to ensure that menus as well as responses are sevrved faster and better to ensure a seamless user experience.
-The MNO also lets you control the session this is done basically by attaching CON or END at the sart of every response
+USSD is session driven, What does this mean ?, well whenever you dial *XXX# a session with a unique Id is created and maintained to allow interaction of the end device and the remote API. [The session typically lasts 180s for most MNOs in Kenya ](https://help.africastalking.com/en/articles/1284071-what-is-the-duration-of-a-ussd-session-for-kenyan-telcos) it may be different for MNOs in other countries. As the developer, you'll need to keep track of the session and be cautious of the time limit to ensure that menus, as well as responses, are served faster and better to ensure a seamless user experience.
+The MNO also lets you control the session, this is done by attaching CON or END at the start of every response
 
-    CON: It means an intermediate menu or that session is CONtinuing and hence will require user input
-    END: Means the final menu and will trigger session termination i.e session is ENDing.
+    CON: Means an intermediate menu or that the session is CONtinuing and hence will require user input
+    END: This means the final menu and will trigger session termination i.e session is ENDing.
 
 The above is properly documented on [Africas Talking's dev docs](https://developers.africastalking.com/docs/ussd/handle_sessions)
 
 To get us started head over to [Spring Initializr](https://start.spring.io/) and start your project with the following dependencies
 - Spring Web
-- Lombok
+- Lombok (To get rid of boilerplate code by providing encapsulations support)
 - Spring Data Redis
 
 The src folder structure is as below
@@ -46,28 +51,37 @@ main
 │               └── UssdApplication.java
 ```
 
-To start us off lets create a controller IndexController.java 
+To start us off let's create a controller .i.e. IndexController.java 
 
 
 ```java
 /**
-* @param text This shows the user input. It is an empty string in the first notification of a session. After that, it concatenates all the user input within the session with a * until the session ends
-* @param sessionId A unique value generated when the session starts and sent every time a mobile subscriber response has been received.
-* @param serviceCode This is the USSD code assigned to your application
-* @param phoneNumber The number of the mobile subscriber interacting with your ussd application.
+* @param text: This shows the user input. It is an empty string in the first notification of a session. After that, it concatenates all the user input within the session with a * until the session ends
+* @param sessionId: A unique value generated when the session starts and sent every time a mobile subscriber response has been received.
+* @param serviceCode: This is the USSD code assigned to your application
+* @param phoneNumber: The number of mobile subscribers interacting with your ussd application.
 * @throws IOException
 * @return
 **/
 @PostMapping(path = "ussd")
 public String ussdIngress(@RequestParam String sessionId, @RequestParam String serviceCode,
         @RequestParam String phoneNumber, @RequestParam String text) throws IOException {
-    // forward to service layer
+    // forward to the service layer
+    try {
+        return ussdRoutingService.menuLevelRouter(sessionId, serviceCode, phoneNumber, text);
+    } catch (IOException e) {
+        // Gracefully shut down in case of error
+        return "END Service is temporarily down" ;
+    }
 }
 ```
 ## Session Handling
 
-This tutorial is tightly coupled to Africa's talking USSD provision, hence session management depends heavily on the ***sessionId*** Param provided to the callback registerd for the serviceCode. We inturn need to store the session Id to enable us track and destroy the session accordingly from the API end. Caching becomes extremely important at this point as it will allow faster storage and retreival of the active sessions.
-The cache layer for this particular tutorial will be implemented on redis. Let's start by configuring everrything needed by Redis to handle the session form the application end.
+This implementation is tightly coupled to Africa's talking USSD provision, hence session management depends heavily on the ***sessionId*** Param provided to the callback registered for the serviceCode. We will need to store the sessionId to enable us to track and destroy the session accordingly from the API's end. Caching becomes extremely important at this point as it will allow faster storage and retrieval of the active sessions.
+
+> The session can be stored in the DB however Queries to the Database are expensive and hence in-memory caching becomes an obvious strategy to implement
+
+The cache layer for this particular tutorial will be implemented on Redis. Let's start by configuring everything needed by Redis to handle the session from the application's end.
 
 1. Create  @[redis labs](https://redislabs.com/try-free/) account and deploy a free redis instance
 2. Setting Up application configurations
@@ -99,7 +113,7 @@ The cache layer for this particular tutorial will be implemented on redis. Let's
             default-ttl: 180
     ```
 3. Redis configurations
-    You we'll use Lettuce which comes readliy within spring data redis to configure the connection Factory
+    We'll use Lettuce which comes readily integrated within spring data redis to configure the connection Factory
     configs/RedisConfiguration.java
    ```java
     @Configuration
@@ -191,14 +205,14 @@ The cache layer for this particular tutorial will be implemented on redis. Let's
 
 ## Dynamic Menus
 
-It's important to have the ability to load menus dynamically at runtime, reason being that making changes to dynamically served data is much easier than on statically defines menus may need recompilation and redeployment of the app.
+It's important to have the ability to load menus dynamically at runtime, the reason being that making changes to dynamically served data is much easier than on statically defined menus may need recompilation and redeployment of the app.
 
 ### Menu Structure
 
 1. Menu Levels
-   For every request to the API the server responds with a message, sending the user deeper into the implemented sequence hence the term levels. Its important to keep track of where the user is currently at to know which Menu or reponse to serve.
+   For every request to the API, the server responds with a message, sending the user deeper into the implemented sequence hence the term levels. It's important to keep track of where the user is currently at, to know which Menu or response to serve.
 2. Menu Options
-   As the name suggests these are just options provided to the user within the Menu to allow the user know how to respond on the USSD interface.
+   As the name suggests these are just options provided to the user within the Menu to allow the user to know how to respond on the USSD interface.
 
 To start us off with the Menus we'll define the structure of the Menu Levels and Options
 
@@ -219,7 +233,7 @@ public class Menu {
     private List<MenuOption> menuOptions; // Options available for this Menu Level
 
     @JsonProperty("max_selections")
-    private Integer maxSelections; // Max selection identifier to enable diferentiation between value provided and options selections i.e. if request is for Acc No and options are 3 the as simple check for when the value is above 3 would suffice.
+    private Integer maxSelections; // Max selection identifier to enable diferentiation between value provided and option selections i.e if request data is greater than maxSelections then it is determined that that is an input.
 }
 ```
 
@@ -264,9 +278,9 @@ public enum MenuOptionAction {
 ```
 
 #### The Actual Menus
-For this tutorial we'll store the menus in a json file within the resource folder.
+For this tutorial, we'll store the menus in a JSON file within the resource folder.
 
-> **Note** that replaceable vars are denotes as ${XXXXXX}
+> **Note** that replaceable vars are denoted as ${XXXXXX}
 
 ```json menus.json
 {
@@ -314,7 +328,7 @@ For this tutorial we'll store the menus in a json file within the resource folde
 ```
 
 #### Fetching the Menu from the store. 
-Since the Menus are stored in the resource folder all we need to do is directlu read the data into an InputStream that will be converted to String and Map that to the correct Type.
+Since the Menus are stored in the resource folder all we need to do is directly read the data into an InputStream that will be converted to String and Map that to the correct Type.
 
 Create a MenuService within the service folder and add the code below.
 
@@ -440,7 +454,7 @@ Let's now put everything together by creating the UssdRoutingService within the 
 ```
 
 
-- Processing the provided input, determining the response type and updatting the session accordingly
+- Processing the provided input, determining the response type, and updating the session accordingly
 
 ```java
     /**
@@ -462,7 +476,7 @@ Let's now put everything together by creating the UssdRoutingService within the 
 ```
 
 
-- Checking the response action and and swithing throun the avaialble Action types
+- Checking the response action and switching through the available Action types.
 This is where API calls to an external service can be made to trigger certain events or pull data from said API.
 
 ```java
@@ -489,7 +503,7 @@ This is where API calls to an external service can be made to trigger certain ev
         return response;
     }
 ```
-- Replace variables on the response text with the fetched data usin the **StringSubstitutor** class. for this step you need to first add the org.apache.commons, commons-text and commons-lang3 dependencies
+- Replace variables on the response text with the fetched data using the **StringSubstitutor** class. for this step, you need to first add the org.apache.commons, commons-text, and commons-lang3 dependencies
 
 ```xml
 <dependency>
@@ -519,7 +533,7 @@ This is where API calls to an external service can be made to trigger certain ev
 ```
 
 
-- Updating Session Data wiht the newly set level as well as the previous session this will allow for complex functionality such as allowing movment back and forth through the available menus
+- Updating Session Data with the newly set level as well as the previous session, will allow for complex functions such as allowing movement back and forth through the available menus
 
 ```java
     /**
@@ -570,19 +584,69 @@ This is where API calls to an external service can be made to trigger certain ev
 ```
 
 ## Deployment of the USSD platform
-For this Particular implementation Elastic Beanstalk was chosen for deployment. find more on this refer to [@aws beanstalk](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/create_deploy_docker.html). For More in formation on how to dockerize Spring boot applications please refer to [this](https://developers.decoded.africa/dockerizing-spring-boot/) article. 
+For this particular implementation, Elastic Beanstalk was chosen for deployment. find more on this refer to [@aws beanstalk](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/create_deploy_docker.html). For More information on how to dockerize Spring boot applications please refer to [this](https://developers.decoded.africa/dockerizing-spring-boot/) article. 
 
-Once we have deployed the application. Next is to link the particular deployment to a service code and allow phone users access our application on USSD.
 
-Steps to linking service Code
-- Head over to Africas talking create an account or login if you already have one. 
+below are a few snippets of the docker file as well as Dockerrun.aws for elastic beanstalk
+```Docker
+# Start with a base image containing Java runtime
+FROM maven:3.6.3-jdk-8-slim AS build
+
+COPY src /usr/src/app/src
+
+COPY pom.xml /usr/src/app
+
+RUN mvn -f /usr/src/app/pom.xml clean package
+
+
+FROM openjdk:8-jdk-alpine
+
+# Make port 8080 available to the world outside this container
+EXPOSE 8080 
+
+COPY --from=build /usr/src/app/target/ussd-0.0.1-SNAPSHOT.jar /usr/app/target/ussd-0.0.1-SNAPSHOT.jar
+
+# Run the jar file 
+ENTRYPOINT ["java","-Djava.security.egd=file:/dev/./urandom","-jar","/usr/app/target/ussd-0.0.1-SNAPSHOT.jar"]
+```
+
+```json
+{
+    "AWSEBDockerrunVersion": "1",
+    "Image": {
+        "Update": "true"
+    },
+    "Ports": [
+        {
+            "ContainerPort": "8080"
+        }
+    ],
+    "Logging": "/var/log/",
+    "Volumes": []
+}
+```
+
+
+Once we have deployed the application the next step is to link the particular deployment to a service code and allow phone users to access our application on USSD.
+
+**Steps to linking service Code** are as below; 
+- Head over to [Africa's talking](https://africastalking.com)and create an account or login if you already have one. 
 - Switch to sandbox
-- Open the USSD menu and create a channel
-  ![](./images/1.png)
-- Link Channel callback to the url of the hosted app
-    ![](./images/2.png)
+- Open the USSD menu and create a channel as shown below;
+  ![](https://raw.githubusercontent.com/adams-okode/spring-boot-ussd-demo/main/images/1.png)
+- Link Channel callback to the URL of the hosted app
+    ![](https://raw.githubusercontent.com/adams-okode/spring-boot-ussd-demo/main/images/2.png)
 
-    ![](./images/3.png)
+    ![](https://raw.githubusercontent.com/adams-okode/spring-boot-ussd-demo/main/images/3.png)
 
-- Test App Using the simulator
+- Test App Using the [simulator](https://simulator.africastalking.com:1517/simulator/ussd)
 
+
+# Conclusion
+You should now have a basic idea of how ussd applications work and how to implement the same on spring-boot. The information and demonstration provided in this guide is not the only way to handle ussd applications in production, There are definitely a multitude of other battle-tested implementations, this is mainly based on implementations I've seen in some of the projects I have been involved in.
+
+This [@repo](https://github.com/adams-okode/spring-boot-ussd-demo) has the full implementation of the content discussed within the tutorial, A docker-compose file is readily available to allow quick deployment and testing of the implementation. Also if you need a ussd emulator you can host locally [@this](https://github.com/habbes/ussd-emulator) works fine be sure to modify the request type from GET to POST as our project has been implemented with a POST hook in mind.
+
+That's all. Feel free to raise any issues on [Github](https://github.com/adams-okode/spring-boot-ussd-demo) or start a discussion.
+
+Good Luck & ___Happy Coding___ 
