@@ -1,13 +1,11 @@
 package com.decoded.ussd.configs;
 
-import java.util.Map;
-
+import lombok.Data;
+import lombok.Getter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.Getter;
+import static lombok.AccessLevel.PUBLIC;
 
 @Configuration
 @ConfigurationProperties(prefix = "decoded")
@@ -16,7 +14,7 @@ public class ApplicationConfiguration {
 
     private CacheConfigurationProperties cache;
 
-    @Getter(value = AccessLevel.PUBLIC)
+    @Getter(value = PUBLIC)
     private class CacheConfigurationProperties {
         private Integer port;
         private String host;

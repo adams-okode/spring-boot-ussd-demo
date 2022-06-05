@@ -1,17 +1,15 @@
 package com.decoded.ussd.services;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-
 import com.decoded.ussd.data.Menu;
 import com.decoded.ussd.data.MenuOption;
 import com.decoded.ussd.data.UssdSession;
-import com.decoded.ussd.enums.MenuOptionAction;
-
 import org.apache.commons.text.StringSubstitutor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class UssdRoutingService {
@@ -38,11 +36,7 @@ public class UssdRoutingService {
         /**
          * Check if response has some value
          */
-        if (text.length() > 0) {
-            return getNextMenuItem(session, menus);
-        } else {
-            return menus.get(session.getCurrentMenuLevel()).getText();
-        }
+        return text.length() > 0 ? getNextMenuItem(session, menus) : menus.get(session.getCurrentMenuLevel()).getText();
     }
 
     /**
@@ -72,8 +66,7 @@ public class UssdRoutingService {
      * @throws IOException
      */
     public String getMenu(String menuLevel) throws IOException {
-        Map<String, Menu> menus = menuService.loadMenus();
-        return menus.get(menuLevel).getText();
+        return menuService.loadMenus().get(menuLevel).getText();
     }
 
     /**
@@ -83,13 +76,14 @@ public class UssdRoutingService {
      * @throws IOException
      */
     public String processMenuOption(UssdSession session, MenuOption menuOption) throws IOException {
-        if (menuOption.getType().equals("response")) {
-            return processMenuOptionResponses(menuOption);
-        } else if (menuOption.getType().equals("level")) {
-            updateSessionMenuLevel(session, menuOption.getNextMenuLevel());
-            return getMenu(menuOption.getNextMenuLevel());
-        } else {
-            return "CON ";
+        switch (menuOption.getType()) {
+            case "response":
+                return processMenuOptionResponses(menuOption);
+            case "level":
+                updateSessionMenuLevel(session, menuOption.getNextMenuLevel());
+                return getMenu(menuOption.getNextMenuLevel());
+            default:
+                return "CON ";
         }
     }
 
@@ -102,15 +96,19 @@ public class UssdRoutingService {
         String response = menuOption.getResponse();
         Map<String, String> variablesMap = new HashMap<>();
 
-        if (menuOption.getAction() == MenuOptionAction.PROCESS_ACC_BALANCE) {
-            variablesMap.put("account_balance", "10000");
-            response = replaceVariable(variablesMap, response);
-        } else if (menuOption.getAction() == MenuOptionAction.PROCESS_ACC_NUMBER) {
-            variablesMap.put("account_number", "123412512");
-            response = replaceVariable(variablesMap, response);
-        } else if (menuOption.getAction() == MenuOptionAction.PROCESS_ACC_PHONE_NUMBER) {
-            variablesMap.put("phone_number", "254702759950");
-            response = replaceVariable(variablesMap, response);
+        switch (menuOption.getAction()) {
+            case PROCESS_ACC_BALANCE:
+                variablesMap.put("account_balance", "10000");
+                response = replaceVariable(variablesMap, response);
+                break;
+            case PROCESS_ACC_NUMBER:
+                variablesMap.put("account_number", "123412512");
+                response = replaceVariable(variablesMap, response);
+                break;
+            case PROCESS_ACC_PHONE_NUMBER:
+                variablesMap.put("phone_number", "254702759950");
+                response = replaceVariable(variablesMap, response);
+                break;
         }
 
         return response;
@@ -123,8 +121,7 @@ public class UssdRoutingService {
      * @return
      */
     public String replaceVariable(Map<String, String> variablesMap, String response) {
-        StringSubstitutor sub = new StringSubstitutor(variablesMap);
-        return sub.replace(response);
+        return new StringSubstitutor(variablesMap).replace(response);
     }
 
     /**
