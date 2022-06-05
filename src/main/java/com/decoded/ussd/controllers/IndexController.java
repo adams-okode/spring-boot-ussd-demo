@@ -1,18 +1,13 @@
 package com.decoded.ussd.controllers;
 
-import java.io.IOException;
-import java.util.Map;
-
 import com.decoded.ussd.data.Menu;
 import com.decoded.ussd.services.MenuService;
 import com.decoded.ussd.services.UssdRoutingService;
-
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.io.IOException;
+import java.util.Map;
 
 @RestController
 @CrossOrigin("*")
@@ -37,10 +32,9 @@ public class IndexController {
     /**
      * 
      * @return
-     * @throws IOException
      */
     @GetMapping(path = "")
-    public String index() throws IOException {
+    public String index() {
         return "Your have reached us";
     }
 
@@ -51,11 +45,10 @@ public class IndexController {
      * @param phoneNumber
      * @param text
      * @return
-     * @throws IOException
      */
     @PostMapping(path = "ussd")
     public String ussdIngress(@RequestParam String sessionId, @RequestParam String serviceCode,
-            @RequestParam String phoneNumber, @RequestParam String text) throws IOException {
+            @RequestParam String phoneNumber, @RequestParam String text) {
         try {
             return ussdRoutingService.menuLevelRouter(sessionId, serviceCode, phoneNumber, text);
         } catch (IOException e) {
