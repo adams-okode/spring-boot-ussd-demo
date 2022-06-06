@@ -99,18 +99,16 @@ public class UssdRoutingService {
         switch (menuOption.getAction()) {
             case PROCESS_ACC_BALANCE:
                 variablesMap.put("account_balance", "10000");
-                response = replaceVariable(variablesMap, response);
                 break;
             case PROCESS_ACC_NUMBER:
                 variablesMap.put("account_number", "123412512");
-                response = replaceVariable(variablesMap, response);
                 break;
             case PROCESS_ACC_PHONE_NUMBER:
                 variablesMap.put("phone_number", "254702759950");
-                response = replaceVariable(variablesMap, response);
                 break;
         }
 
+        response = replaceVariable(variablesMap, response);
         return response;
     }
 
